@@ -1,0 +1,33 @@
+name: native-libs
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with: { go-version: stable }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: libXray
+        run: |
+          export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
+          git clone --depth 1 https://github.com/XTLS/libXray
+          cd libXray
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+          python3 build/main.py android
+          ls -la *.aar
+      - name: hev-socks5-tunnel
+        run: |
+          export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
+          mkdir -p hev/jni && cd hev
+          echo 'include $(call all-subdir-makefiles)' > jni/Android.mk
+          git clone --depth 1 --recursive https://github.com/heiher/hev-socks5-tunnel jni/hev-socks5-tunnel
+          $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=$PWD APP_BUILD_SCRIPT=$PWD/jni/Android.mk APP_ABI="armeabi-v7a arm64-v8a x86_64" APP_PLATFORM=android-26 NDK_LIBS_OUT=$PWD/jniLibs "APP_CFLAGS=-O3 -DPKGNAME=hev/htproxy -DCLSNAME=TProxyService"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-libs
+          path: |
+            libXray/libXray.aar
+            hev/jniLibs
